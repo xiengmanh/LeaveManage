@@ -247,7 +247,7 @@ if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("See
 
 app.Run();
 }
-catch (Exception exception)
+catch (Exception exception) when (exception is not HostAbortedException)
 {
     Log.Fatal(exception, "Ứng dụng dừng bất thường khi khởi động.");
 }
@@ -255,3 +255,6 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+/// <summary>Khai báo partial để project test (WebApplicationFactory) tham chiếu được Program.</summary>
+public partial class Program { }
