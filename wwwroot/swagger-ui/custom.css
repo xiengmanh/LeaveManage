@@ -1,0 +1,9 @@
+/* Custom Swagger UI Styling */
+.swagger-ui .topbar { display: none; }
+.swagger-ui .info { margin-bottom: 20px; }
+.swagger-ui .info .title { color: #1f6feb; font-size: 32px; }
+.swagger-ui .opblock-tag { font-size: 18px; border: none; }
+.swagger-ui .opblock { border-radius: 8px; margin-bottom: 10px; }
+.swagger-ui .opblock-summary { font-weight: 600; }
+.swagger-ui .btn.authorize { background-color: #1f6feb; border-color: #1f6feb; }
+.swagger-ui .scheme-container { background: #f6f8fa; padding: 15px; border-radius: 8px; }

@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+Logs/
+logs/
+*.log
+wwwroot/images/*
+!wwwroot/images/.gitkeep
+*.local.txt
+appsettings.*.local.json
+TestResults/
