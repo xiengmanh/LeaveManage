@@ -143,6 +143,13 @@ public class UsersController : ControllerBase
         int id,
         [FromBody] UserUpdateDto request)
     {
+        // Không cho Admin tự khóa hoặc tự hạ quyền chính mình (tránh mất quyền quản trị)
+        if (IsCurrentUser(id) && (request.IsActive == false
+            || (request.Role is not null && !request.Role.Equals(UserRoles.Admin, StringComparison.OrdinalIgnoreCase))))
+        {
+            return BadRequest(CreateError("Không thể tự khóa hoặc tự hạ quyền tài khoản đang đăng nhập.", "CANNOT_CHANGE_SELF"));
+        }
+
         var result = await _userService.UpdateAsync(id, request);
 
         if (!result.IsSuccess)
@@ -158,6 +165,9 @@ public class UsersController : ControllerBase
     [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     public async Task<IActionResult> Delete(int id)
     {
+        if (IsCurrentUser(id))
+            return BadRequest(CreateError("Không thể tự xóa tài khoản đang đăng nhập.", "CANNOT_CHANGE_SELF"));
+
         var result = await _userService.DeleteAsync(id);
 
         if (!result.IsSuccess)
@@ -167,6 +177,9 @@ public class UsersController : ControllerBase
 
         return Ok(SuccessResponse.Ok(result.Message));
     }
+
+    private bool IsCurrentUser(int id) =>
+        int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentId) && currentId == id;
 
     private ObjectResult MapFailure(string message, string? errorCode)
     {

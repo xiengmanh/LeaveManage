@@ -71,6 +71,10 @@ public class AuthTests
             new { username = "trunglink", email = "trung@example.test", password = ApiFixture.DemoPassword, employeeId = 3 });
         Assert.Equal(HttpStatusCode.Conflict, duplicateLink.StatusCode);
 
+        var users = await admin.GetFromJsonAsync<JsonElement>("/api/users?searchTerm=admin");
+        var adminId = users.GetProperty("items").EnumerateArray().First(u => u.GetProperty("username").GetString() == "admin").GetProperty("id").GetInt32();
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/users/{adminId}", new { isActive = false })).StatusCode);
+
         var lockResponse = await admin.PutAsJsonAsync($"/api/users/{userId}", new { isActive = false });
         Assert.Equal(HttpStatusCode.OK, lockResponse.StatusCode);
         var login = await _api.CreateClient().PostAsJsonAsync("/api/users/login", new { username = "khongnv", password = ApiFixture.DemoPassword });
