@@ -97,6 +97,17 @@ builder.Services
             RoleClaimType = ClaimTypes.Role,
             ClockSkew = TimeSpan.Zero
         };
+        // Chữ ký đúng chưa đủ: tài khoản phải còn tồn tại, còn hoạt động, đúng TokenVersion,
+        // Role và EmployeeId. Nhờ vậy khóa tài khoản / logout / đổi quyền có hiệu lực ngay với JWT cũ.
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var authService = context.HttpContext.RequestServices.GetRequiredService<IAuthService>();
+                if (!await authService.IsAccessTokenCurrentAsync(context.Principal!))
+                    context.Fail("Phiên đăng nhập đã bị thu hồi hoặc tài khoản đã thay đổi.");
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>

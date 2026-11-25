@@ -12,3 +12,5 @@ wwwroot/images/*
 *.local.txt
 appsettings.*.local.json
 TestResults/
+backups/
+*.bak

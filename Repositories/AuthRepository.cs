@@ -14,13 +14,51 @@ public class AuthRepository : IAuthRepository
     }
 
     public Task<User?> GetByUsernameAsync(string username) =>
-        _context.Users.FirstOrDefaultAsync(user => user.Username == username);
+        _context.Users.AsNoTracking().FirstOrDefaultAsync(user => user.Username == username);
 
-    public Task<User?> GetByIdAsync(int id) =>
-        _context.Users.FirstOrDefaultAsync(user => user.Id == id);
+    public Task<AccountAuthState?> GetAuthStateAsync(int userId) =>
+        _context.Users.AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new AccountAuthState(user.IsActive, user.TokenVersion, user.Role, user.EmployeeId))
+            .FirstOrDefaultAsync();
 
-    public Task<User?> GetByRefreshTokenHashAsync(string refreshTokenHash) =>
-        _context.Users.FirstOrDefaultAsync(user => user.RefreshTokenHash == refreshTokenHash);
+    public async Task<bool> TryStoreRefreshTokenAsync(int userId, int expectedTokenVersion, string refreshTokenHash, DateTime expiresAt)
+    {
+        var rows = await _context.Users
+            .Where(user => user.Id == userId && user.IsActive && user.TokenVersion == expectedTokenVersion)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(user => user.RefreshTokenHash, refreshTokenHash)
+                .SetProperty(user => user.RefreshTokenExpiresAt, expiresAt));
+        return rows == 1;
+    }
 
-    public async Task<bool> SaveChangesAsync() => await _context.SaveChangesAsync() > 0;
+    public async Task<User?> RotateRefreshTokenAsync(string oldHash, string newHash, DateTime newExpiresAt, DateTime now)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        // Một câu UPDATE có điều kiện: SQL Server khóa dòng khi cập nhật, request đến sau phải chờ
+        // rồi đánh giá lại điều kiện trên dữ liệu mới → hash cũ không còn khớp → 0 dòng → thua.
+        var rows = await _context.Users
+            .Where(user => user.RefreshTokenHash == oldHash
+                && user.RefreshTokenExpiresAt > now
+                && user.IsActive)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(user => user.RefreshTokenHash, newHash)
+                .SetProperty(user => user.RefreshTokenExpiresAt, newExpiresAt));
+        if (rows != 1)
+            return null; // không commit → rollback khi dispose
+
+        // Đọc thông tin (gồm TokenVersion) trong cùng transaction, trước khi logout/khóa kịp chen vào
+        var user = await _context.Users.AsNoTracking().FirstAsync(u => u.RefreshTokenHash == newHash);
+        await transaction.CommitAsync();
+        return user;
+    }
+
+    public Task RevokeSessionsAsync(int userId) =>
+        _context.Users
+            .Where(user => user.Id == userId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(user => user.TokenVersion, user => user.TokenVersion + 1)
+                .SetProperty(user => user.RefreshTokenHash, (string?)null)
+                .SetProperty(user => user.RefreshTokenExpiresAt, (DateTime?)null));
 }

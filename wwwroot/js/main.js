@@ -55,7 +55,8 @@ async function handleRoute({ path, query }) {
   try {
     await route.handler(content, { user, query, signal: activeController.signal });
   } catch (error) {
-    if (error.name !== 'AbortError') {
+    // 401 (phiên bị thu hồi/hết hạn) đã được xử lý qua sự kiện auth:expired → về trang đăng nhập
+    if (error.name !== 'AbortError' && error.status !== 401) {
       console.error(error);
       toast('Không thể hiển thị trang. Vui lòng thử lại.', 'danger');
     }

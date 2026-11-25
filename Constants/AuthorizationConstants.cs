@@ -28,4 +28,5 @@ public static class CustomClaimTypes
     public const string Department = "Department";
     public const string Age = "Age";
     public const string EmployeeId = "EmployeeId";
+    public const string TokenVersion = "TokenVersion";
 }

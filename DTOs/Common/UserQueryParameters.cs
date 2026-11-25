@@ -6,6 +6,7 @@ public class UserQueryParameters
 
     private int _pageNumber = 1;
 
+    [System.ComponentModel.DataAnnotations.Range(1, LeaveManage.Constants.PagingLimits.MaxPage)]
     public int PageNumber
     {
         get => _pageNumber;

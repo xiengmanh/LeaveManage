@@ -99,7 +99,9 @@ public class ScopeTests
     {
         Assert.Equal(new List<int> { 3 }, await EmployeeIds(await _api.LoginAsync("nv003")));
         Assert.Equal(new List<int> { 2, 3, 4, 6 }, await EmployeeIds(await _api.LoginAsync("manager")));
-        Assert.Equal(6, (await EmployeeIds(await _api.LoginAsync("admin"))).Count);
+        // Admin thấy toàn bộ; các test khác có thể tạo thêm nhân viên nên kiểm tra đủ 6 nhân viên mẫu
+        var all = await EmployeeIds(await _api.LoginAsync("admin"));
+        Assert.True(new[] { 1, 2, 3, 4, 5, 6 }.All(all.Contains));
     }
 
     [Fact]

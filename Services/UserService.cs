@@ -11,11 +11,13 @@ public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
     private readonly IPasswordService _passwordService;
+    private readonly IAuthRepository _authRepository;
 
-    public UserService(IUserRepository userRepository, IPasswordService passwordService)
+    public UserService(IUserRepository userRepository, IPasswordService passwordService, IAuthRepository authRepository)
     {
         _userRepository = userRepository;
         _passwordService = passwordService;
+        _authRepository = authRepository;
     }
 
     public async Task<PagedResult<UserResponseDto>> GetAllAsync(
@@ -118,6 +120,8 @@ public class UserService : IUserService
 
         var username = request.Username?.Trim();
         var email = request.Email?.Trim();
+        // Thay đổi ảnh hưởng tới xác thực/phân quyền → phải thu hồi các phiên (JWT, refresh token) cũ
+        var revokeSessions = false;
 
         var duplicateExists = await _userRepository
             .IsUsernameOrEmailUsedByAnotherAsync(id, username, email);
@@ -153,8 +157,10 @@ public class UserService : IUserService
                     null);
             }
 
-            user.Role = UserRoles.All.First(item =>
+            var newRole = UserRoles.All.First(item =>
                 item.Equals(role, StringComparison.OrdinalIgnoreCase));
+            revokeSessions |= newRole != user.Role;
+            user.Role = newRole;
         }
 
         if (!string.IsNullOrWhiteSpace(request.Department))
@@ -171,6 +177,7 @@ public class UserService : IUserService
                 out var passwordSalt);
             user.PasswordHash = passwordHash;
             user.PasswordSalt = passwordSalt;
+            revokeSessions = true;
         }
 
         if (request.EmployeeId.HasValue && request.EmployeeId != user.EmployeeId)
@@ -179,22 +186,21 @@ public class UserService : IUserService
             if (linkError is not null)
                 return (false, linkError.Value.Message, linkError.Value.Code, null);
             user.EmployeeId = request.EmployeeId;
+            revokeSessions = true;
         }
 
         if (request.IsActive.HasValue)
         {
+            revokeSessions |= user.IsActive && !request.IsActive.Value; // khóa tài khoản
             user.IsActive = request.IsActive.Value;
-            if (!user.IsActive)
-            {
-                // Khóa tài khoản thì thu hồi luôn refresh token
-                user.RefreshTokenHash = null;
-                user.RefreshTokenExpiresAt = null;
-            }
         }
 
         user.UpdatedAt = DateTime.UtcNow;
-        _userRepository.Update(user);
+        // Entity đang được tracking: SaveChanges chỉ ghi các cột đã đổi. Không gọi DbSet.Update (đánh dấu
+        // MỌI cột) vì sẽ ghi đè TokenVersion/RefreshTokenHash cũ nếu logout/refresh chạy xen giữa.
         await _userRepository.SaveChangesAsync();
+        if (revokeSessions)
+            await _authRepository.RevokeSessionsAsync(id);
 
         return (
             true,

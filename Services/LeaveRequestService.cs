@@ -1,3 +1,4 @@
+using LeaveManage.Constants;
 using LeaveManage.DTOs.Requests;
 using LeaveManage.DTOs.Responses;
 using LeaveManage.Exceptions;
@@ -63,7 +64,8 @@ public class LeaveRequestService : ILeaveRequestService
 
     public async Task<PaginatedResponse<LeaveApprovalResponse>> GetApprovalHistoryAsync(int page, int pageSize, CallerContext caller)
     {
-        page = Math.Max(1, page);
+        if (page < 1 || page > PagingLimits.MaxPage)
+            throw new BadRequestException($"Số trang phải từ 1 đến {PagingLimits.MaxPage}.", "INVALID_PAGE");
         pageSize = Math.Clamp(pageSize, 1, 50);
         var (items, total) = await _repository.GetApprovalsPagedAsync(DataScope.For(caller), page, pageSize);
         return new PaginatedResponse<LeaveApprovalResponse>
@@ -107,22 +109,34 @@ public class LeaveRequestService : ILeaveRequestService
 
     public async Task<LeaveRequestResponse> UpdateDraftAsync(int id, UpdateLeaveRequestDto dto, CallerContext caller)
     {
-        var request = await _repository.GetRequestTrackedAsync(id);
-        EnsureOwner(request, caller);
-        if (request!.Status != LeaveRequestStatus.Draft)
-            throw new ConflictException("Chỉ sửa được đơn ở trạng thái Nháp.", "INVALID_STATUS");
+        var employeeId = caller.RequireEmployeeId();
 
-        var (leaveType, start, end, days) = await ValidateRequestDataAsync(dto);
-        request.LeaveTypeId = leaveType.Id;
-        request.StartDate = start;
-        request.EndDate = end;
-        request.TotalDays = days;
-        request.PaidDays = CalculatePaidDays(leaveType, days);
-        request.Reason = dto.Reason.Trim();
-        request.ContactAddress = dto.ContactAddress?.Trim();
-        request.ContactPhone = dto.ContactPhone?.Trim();
-        request.UpdatedAt = DateTime.UtcNow;
-        await _repository.SaveChangesAsync();
+        await _repository.ExecuteInTransactionAsync(async () =>
+        {
+            // Cùng giao thức với Submit/Approve/Cancel: khóa nhân viên TRƯỚC rồi mới đọc đơn.
+            // Nếu Submit đang chạy, lệnh sửa phải chờ; sau khi có khóa sẽ thấy trạng thái mới nhất
+            // (đã Pending → 409), nên TotalDays không bao giờ lệch với PendingDays đã giữ chỗ.
+            await _repository.LockEmployeeAsync(employeeId);
+
+            var request = await _repository.GetRequestTrackedAsync(id);
+            EnsureOwner(request, caller);
+            if (request!.Status != LeaveRequestStatus.Draft)
+                throw new ConflictException("Chỉ sửa được đơn ở trạng thái Nháp.", "INVALID_STATUS");
+
+            var (leaveType, start, end, days) = await ValidateRequestDataAsync(dto);
+            request.LeaveTypeId = leaveType.Id;
+            request.StartDate = start;
+            request.EndDate = end;
+            request.TotalDays = days;
+            request.PaidDays = CalculatePaidDays(leaveType, days);
+            request.Reason = dto.Reason.Trim();
+            request.ContactAddress = dto.ContactAddress?.Trim();
+            request.ContactPhone = dto.ContactPhone?.Trim();
+            request.UpdatedAt = DateTime.UtcNow;
+            await _repository.SaveChangesAsync();
+            return true;
+        });
+
         return await GetByIdAsync(id, caller);
     }
 

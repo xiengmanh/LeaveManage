@@ -1,4 +1,5 @@
 using System.Data;
+using LeaveManage.Constants;
 using LeaveManage.Data;
 using LeaveManage.DTOs.Requests;
 using LeaveManage.Models;
@@ -89,7 +90,7 @@ public class LeaveRepository : ILeaveRepository
             .Include(r => r.Employee)
             .Include(r => r.LeaveType)
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
-            .Skip((q.Page - 1) * q.PageSize)
+            .Skip(PagingLimits.Skip(q.Page, q.PageSize))
             .Take(q.PageSize)
             .ToListAsync();
         return (items, total);
@@ -192,7 +193,7 @@ public class LeaveRepository : ILeaveRepository
             .Include(a => a.Approver)
             .Include(a => a.LeaveRequest)
             .OrderByDescending(a => a.ActionDate).ThenByDescending(a => a.Id)
-            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Skip(PagingLimits.Skip(page, pageSize)).Take(pageSize)
             .ToListAsync();
         return (items, total);
     }

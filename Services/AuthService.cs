@@ -31,44 +31,53 @@ public class AuthService : IAuthService
         if (user is null || !user.IsActive || !_passwordService.Verify(request.Password, user.PasswordHash, user.PasswordSalt))
             return null;
 
-        return await IssueTokenPairAsync(user);
+        var (refreshToken, refreshHash, refreshExpiresAt) = CreateRefreshToken();
+        // Chỉ lưu khi tài khoản vẫn hoạt động và chưa bị thu hồi phiên giữa chừng
+        if (!await _authRepository.TryStoreRefreshTokenAsync(user.Id, user.TokenVersion, refreshHash, refreshExpiresAt))
+            return null;
+
+        return BuildResponse(user, refreshToken);
     }
 
     public async Task<AuthResponseDto?> RefreshTokenAsync(string refreshToken)
     {
-        var tokenHash = HashRefreshToken(refreshToken);
-        var user = await _authRepository.GetByRefreshTokenHashAsync(tokenHash);
-
-        if (user is null || !user.IsActive || user.RefreshTokenExpiresAt <= DateTime.UtcNow)
-            return null;
-
-        // Rotation: refresh token cũ bị thay bằng token mới, nên dùng lại token cũ sẽ thất bại
-        return await IssueTokenPairAsync(user);
+        var (newToken, newHash, newExpiresAt) = CreateRefreshToken();
+        // Rotation nguyên tử ở Repository: chỉ một request thắng; token cũ không dùng lại được
+        var user = await _authRepository.RotateRefreshTokenAsync(
+            HashRefreshToken(refreshToken), newHash, newExpiresAt, DateTime.UtcNow);
+        return user is null ? null : BuildResponse(user, newToken);
     }
 
-    public async Task LogoutAsync(int userId)
+    /// <summary>Đăng xuất: xóa refresh token và tăng TokenVersion → access JWT cũ cũng bị từ chối.</summary>
+    public Task LogoutAsync(int userId) => _authRepository.RevokeSessionsAsync(userId);
+
+    public async Task<bool> IsAccessTokenCurrentAsync(ClaimsPrincipal principal)
     {
-        // Thu hồi refresh token: sau khi đăng xuất không thể xin access token mới
-        var user = await _authRepository.GetByIdAsync(userId);
-        if (user is null) return;
-        user.RefreshTokenHash = null;
-        user.RefreshTokenExpiresAt = null;
-        await _authRepository.SaveChangesAsync();
+        if (!int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+            || !int.TryParse(principal.FindFirstValue(CustomClaimTypes.TokenVersion), out var tokenVersion))
+            return false;
+
+        var state = await _authRepository.GetAuthStateAsync(userId);
+        if (state is null || !state.IsActive || state.TokenVersion != tokenVersion)
+            return false; // tài khoản bị xóa/khóa hoặc phiên đã bị thu hồi
+
+        // Role và nhân viên trong token phải khớp dữ liệu hiện tại
+        int? employeeIdInToken = int.TryParse(principal.FindFirstValue(CustomClaimTypes.EmployeeId), out var eid) ? eid : null;
+        return principal.FindFirstValue(ClaimTypes.Role) == state.Role && employeeIdInToken == state.EmployeeId;
     }
 
-    private async Task<AuthResponseDto> IssueTokenPairAsync(User user)
+    private (string Token, string Hash, DateTime ExpiresAt) CreateRefreshToken()
     {
-        var settings = _configuration.GetSection("Jwt");
-        var expiresInMinutes = settings.GetValue<int>("ExpiresInMinutes", 60);
-        var refreshTokenDays = settings.GetValue<int>("RefreshTokenDays", 7);
-        var accessTokenExpiresAt = DateTime.UtcNow.AddMinutes(expiresInMinutes);
-
+        var refreshTokenDays = _configuration.GetSection("Jwt").GetValue<int>("RefreshTokenDays", 7);
         // Refresh token là chuỗi ngẫu nhiên 64 byte; database chỉ lưu bản băm SHA256
-        var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-        user.RefreshTokenHash = HashRefreshToken(refreshToken);
-        user.RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays);
-        await _authRepository.SaveChangesAsync();
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        return (token, HashRefreshToken(token), DateTime.UtcNow.AddDays(refreshTokenDays));
+    }
 
+    private AuthResponseDto BuildResponse(User user, string refreshToken)
+    {
+        var expiresInMinutes = _configuration.GetSection("Jwt").GetValue<int>("ExpiresInMinutes", 60);
+        var accessTokenExpiresAt = DateTime.UtcNow.AddMinutes(expiresInMinutes);
         return new AuthResponseDto
         {
             Token = GenerateJwtToken(user, accessTokenExpiresAt),
@@ -93,6 +102,7 @@ public class AuthService : IAuthService
             new(ClaimTypes.Role, user.Role),
             new(CustomClaimTypes.Department, user.Department),
             new(CustomClaimTypes.Age, user.Age.ToString()),
+            new(CustomClaimTypes.TokenVersion, user.TokenVersion.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
         if (user.EmployeeId is int employeeId)

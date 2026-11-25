@@ -1,3 +1,4 @@
+using LeaveManage.Constants;
 using System.ComponentModel.DataAnnotations;
 
 namespace LeaveManage.DTOs.Requests;
@@ -6,7 +7,7 @@ namespace LeaveManage.DTOs.Requests;
 
 public class EmployeeQueryRequest
 {
-    [Range(1, int.MaxValue)]
+    [Range(1, PagingLimits.MaxPage)]
     public int Page { get; set; } = 1;
 
     [Range(1, 100)]

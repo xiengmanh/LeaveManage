@@ -49,6 +49,12 @@ public class User
 
     public DateTime? RefreshTokenExpiresAt { get; set; }
 
+    /// <summary>
+    /// Phiên bản phiên đăng nhập. Ghi vào JWT (claim TokenVersion) và được kiểm tra ở MỖI request.
+    /// Tăng lên khi logout, khóa tài khoản, đổi role/nhân viên/mật khẩu → mọi JWT cũ hết hiệu lực ngay.
+    /// </summary>
+    public int TokenVersion { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }

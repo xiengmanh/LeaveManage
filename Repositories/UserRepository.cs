@@ -1,3 +1,4 @@
+using LeaveManage.Constants;
 using LeaveManage.Data;
 using LeaveManage.DTOs.Common;
 using LeaveManage.Models;
@@ -57,7 +58,7 @@ public class UserRepository : IUserRepository
 
         // 5. PAGINATION (Chỉ lấy đúng PageSize dòng từ DB)
         var items = await query
-            .Skip((queryParams.PageNumber - 1) * queryParams.PageSize)
+            .Skip(PagingLimits.Skip(queryParams.PageNumber, queryParams.PageSize))
             .Take(queryParams.PageSize)
             .ToListAsync();
 

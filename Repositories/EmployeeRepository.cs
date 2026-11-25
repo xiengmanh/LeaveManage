@@ -1,3 +1,4 @@
+using LeaveManage.Constants;
 using LeaveManage.Data;
 using LeaveManage.DTOs.Requests;
 using LeaveManage.Models;
@@ -53,7 +54,7 @@ public class EmployeeRepository : IEmployeeRepository
         var totalCount = await query.CountAsync();
         var items = await query
             .OrderBy(employee => employee.Id)
-            .Skip((request.Page - 1) * request.PageSize)
+            .Skip(PagingLimits.Skip(request.Page, request.PageSize))
             .Take(request.PageSize)
             .ToListAsync();
 

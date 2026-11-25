@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using LeaveManage.Constants;
 using LeaveManage.Models;
 
 namespace LeaveManage.DTOs.Requests;
@@ -53,7 +54,7 @@ public class CancelLeaveDto
 
 public class LeaveRequestQuery
 {
-    [Range(1, int.MaxValue)]
+    [Range(1, PagingLimits.MaxPage)]
     public int Page { get; set; } = 1;
 
     [Range(1, 50)]
