@@ -38,11 +38,33 @@ Thứ tự trong file:
 2. [Services/AuthService.cs](../Services/AuthService.cs):
    1. Tìm user theo username (qua `AuthRepository`).
    2. Kiểm tra `IsActive` và `PasswordService.Verify`.
-   3. Tạo JWT (claims: id, username, role, `EmployeeId`).
-   4. Tạo refresh token ngẫu nhiên và lưu **bản băm** vào DB.
+   3. Tạo refresh token ngẫu nhiên. `TryStoreRefreshTokenAsync` lưu **bản băm** vào DB bằng `UPDATE` có điều kiện: tài khoản còn hoạt động và `TokenVersion` chưa đổi.
+   4. Tạo JWT (claims: id, username, role, `EmployeeId`, **`TokenVersion`**).
 3. Trả về `{ token, refreshToken, expiresAt, username, role, employeeId }`.
 
-Bài tập tự kiểm tra: dán token vào https://jwt.io (chỉ dùng token demo) và chỉ ra claim `EmployeeId`.
+Bài tập tự kiểm tra: dán token vào https://jwt.io (chỉ dùng token demo) và chỉ ra claim `EmployeeId` và `TokenVersion`.
+
+## Bước 3b — Thu hồi token: `TokenVersion` (sửa lỗi audit P1-02)
+
+JWT là token không trạng thái: chữ ký đúng và còn hạn thì thư viện JWT chấp nhận. Vì vậy:
+- [Program.cs](../Program.cs) gắn sự kiện `OnTokenValidated`. Sau khi chữ ký và hạn hợp lệ, gọi `AuthService.IsAccessTokenCurrentAsync`.
+- Hàm này đọc trạng thái **hiện tại** của tài khoản (`AuthRepository.GetAuthStateAsync`, 1 truy vấn theo khóa chính) và từ chối (401) khi:
+  - tài khoản không còn tồn tại hoặc đã bị khóa;
+  - `TokenVersion` trong token khác `TokenVersion` trong DB;
+  - Role hoặc EmployeeId trong token khác dữ liệu hiện tại.
+- `TokenVersion` tăng (`AuthRepository.RevokeSessionsAsync`, một câu `UPDATE ... SET TokenVersion = TokenVersion + 1`) khi: đăng xuất, khóa tài khoản, đổi role, đổi nhân viên liên kết, đặt lại mật khẩu. Tăng version cũng xóa refresh token.
+- Đăng nhập lại **không** làm token cũ sống lại, vì token cũ vẫn mang version cũ.
+- `UserService.UpdateAsync` **không** gọi `DbSet.Update` (lệnh đó đánh dấu mọi cột). Entity đang được tracking nên `SaveChanges` chỉ ghi cột đã đổi, không ghi đè `TokenVersion` hay refresh token mới hơn.
+
+## Bước 3c — Refresh nguyên tử: `AuthRepository.RotateRefreshTokenAsync` (sửa lỗi audit P1-03)
+
+Bản cũ đọc bản ghi rồi mới ghi hash mới, nên 5 request cùng token có thể cùng đọc thấy hash cũ và cùng thắng. Bản mới:
+1. Mở transaction.
+2. Chạy **một câu** `UPDATE Users SET RefreshTokenHash = @new ... WHERE RefreshTokenHash = @old AND RefreshTokenExpiresAt > @now AND IsActive = 1`.
+3. SQL Server khóa dòng khi cập nhật. Request đến sau phải chờ, rồi đánh giá lại điều kiện trên dữ liệu mới: hash cũ không còn khớp → 0 dòng → **401**.
+4. Request thắng (1 dòng) đọc lại thông tin tài khoản trong cùng transaction rồi mới phát JWT.
+
+Kết hợp với Bước 3b: nếu logout hoặc khóa xảy ra ngay sau đó, `TokenVersion` tăng nên token vừa phát cũng hết hiệu lực.
 
 ## Bước 4 — Một request có bảo vệ: `POST /api/leave-requests/{id}/approve`
 
@@ -64,6 +86,24 @@ Bài tập tự kiểm tra: dán token vào https://jwt.io (chỉ dùng token de
       9. `SaveChangesAsync`, rồi Commit.
    4. Trả về chi tiết đơn.
 5. Nếu Service ném `ConflictException`, [Middleware/ExceptionHandlingMiddleware.cs](../Middleware/ExceptionHandlingMiddleware.cs) chuyển thành JSON 409 kèm `errorCode` và `traceId`.
+
+## Bước 4b — Sửa nháp: `UpdateDraftAsync` (sửa lỗi audit P1-01)
+
+Bản cũ sửa đơn **không khóa**. Nếu "Sửa" và "Gửi duyệt" chạy cùng lúc, Submit đã giữ chỗ 1 ngày rồi lệnh sửa ghi đè thành 2 ngày, nên đơn 2 ngày nhưng `PendingDays` chỉ 1. Sau đó duyệt hoặc hủy đều lỗi.
+
+Bản mới dùng **cùng giao thức** với mọi thao tác thay đổi đơn hoặc số dư:
+1. Mở transaction.
+2. `LockEmployeeAsync`.
+3. **Sau khi có khóa** mới đọc đơn (tracking).
+4. Kiểm tra chủ đơn và trạng thái Nháp.
+5. Kiểm tra dữ liệu.
+6. Lưu, rồi Commit.
+
+Kết quả chỉ có 2 khả năng hợp lệ:
+- **Sửa xong trước:** Gửi duyệt tính theo số ngày mới.
+- **Gửi duyệt xong trước:** lệnh sửa thấy đơn đã Chờ duyệt → 409.
+
+Ghi nhớ: khóa chỉ có tác dụng khi **mọi** thao tác ghi cùng lấy khóa đó.
 
 ## Bước 5 — Gửi duyệt và số dư: `SubmitAsync`
 
@@ -90,13 +130,18 @@ Sau đó `PendingDays += n`, trạng thái chuyển thành Pending.
 
 ## Bước 7 — Phân trang: `GetRequestsPagedAsync`
 
-`IQueryable` → các `Where` (phạm vi, bộ lọc, tìm kiếm) → `CountAsync()` lấy tổng → `Include` → `OrderByDescending` → `Skip((page-1)*pageSize).Take(pageSize)`.
+`IQueryable` → các `Where` (phạm vi, bộ lọc, tìm kiếm) → `CountAsync()` lấy tổng → `Include` → `OrderByDescending` → `Skip(PagingLimits.Skip(page, pageSize)).Take(pageSize)`.
+
+Giới hạn số trang ở [Constants/PagingLimits.cs](../Constants/PagingLimits.cs) (sửa lỗi audit P2-01):
+- Số trang phải từ 1 đến 100.000. DTO kiểm tra bằng `[Range]`, `PagingLimits.Skip` kiểm tra lại và nhân bằng `checked`.
+- Trước đây `page = 2147483647` làm `(page-1)*pageSize` tràn số int và trả 500. Bây giờ trả 400.
 
 ## Bước 8 — Giao diện: [wwwroot/js](../wwwroot/js)
 
 - [core/api.js](../wwwroot/js/core/api.js):
   - gắn header `Authorization: Bearer`;
   - gặp 401 thì gọi `/api/users/refresh` một lần rồi gửi lại request;
+  - nếu refresh cũng 401 (tài khoản bị khóa hoặc đã đăng xuất) thì xóa phiên và về trang đăng nhập;
   - đổi `PaginatedResponse` sang dạng bảng dùng.
 - [core/session.js](../wwwroot/js/core/session.js): lưu token trong `sessionStorage`.
 - [components/layout.js](../wwwroot/js/components/layout.js): menu theo role. Đây chỉ là tiện ích hiển thị; quyền thật do API kiểm tra.
@@ -109,6 +154,14 @@ Sau đó `PendingDays += n`, trạng thái chuyển thành Pending.
   2. Chạy API thật bằng `WebApplicationFactory<Program>`.
   3. Cấp key/mật khẩu riêng cho test.
 - `Concurrency_TwoApproversAtOnce_OnlyOneSucceeds_BalanceDeductedOnce`: dùng `Task.WhenAll` gửi 2 lệnh duyệt cùng lúc.
+- [RegressionTests.cs](../tests/LeaveManage.Tests/RegressionTests.cs): 15 test cho đúng các lỗi audit tìm ra:
+  - sửa nháp đua với gửi duyệt (lặp 15 lượt);
+  - JWT cũ sau khóa, logout, đổi quyền;
+  - 8 refresh cùng lúc;
+  - refresh đua với logout hoặc khóa;
+  - số trang cực lớn.
+
+  Cùng bộ test này chạy trên bản cũ `99955c9` thì fail 14/15.
 
 ## Câu hỏi tự kiểm tra
 
@@ -117,3 +170,5 @@ Sau đó `PendingDays += n`, trạng thái chuyển thành Pending.
 3. Vì sao chỉ lưu bản băm của refresh token?
 4. Đơn từ Thứ 6 đến Thứ 2 tính mấy ngày?
 5. Hủy đơn đã duyệt thì cột nào của `LeaveBalance` thay đổi?
+6. Vì sao chỉ kiểm tra chữ ký JWT là chưa đủ khi khóa tài khoản? `TokenVersion` giải quyết thế nào?
+7. Hai request refresh dùng cùng token: vì sao câu `UPDATE ... WHERE RefreshTokenHash = @old` chỉ cho 1 request thắng?
