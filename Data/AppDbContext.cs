@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<LeaveApproval> LeaveApprovals => Set<LeaveApproval>();
     public DbSet<User> Users => Set<User>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+    public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -63,6 +64,13 @@ public class AppDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(user => user.EmployeeId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ActivityLog>(entity =>
+        {
+            entity.HasIndex(log => log.CreatedAt);
+            entity.HasIndex(log => log.UserId);
+            entity.HasIndex(log => log.Username);
         });
 
         // ===== LEAVE REQUEST =====
@@ -143,12 +151,12 @@ public class AppDbContext : DbContext
 
         // Nhân viên mẫu (giữ từ LTW22, bỏ mật khẩu). Quản lý trực tiếp: NV002 quản lý NV003, NV004, NV006.
         modelBuilder.Entity<Employee>().HasData(
-            new Employee { Id = 1, EmployeeCode = "NV001", FullName = "Nguyễn Văn Giám Đốc", Email = "giamdoc@company.com", PhoneNumber = "0901234567", DateOfBirth = new DateTime(1980, 1, 1), HireDate = new DateTime(2015, 1, 1), DepartmentId = 1, PositionId = 6, ManagerId = null, IsActive = true, CreatedAt = seedTime },
-            new Employee { Id = 2, EmployeeCode = "NV002", FullName = "Trần Thị Quản Lý", Email = "quanly.it@company.com", PhoneNumber = "0901234568", DateOfBirth = new DateTime(1985, 5, 15), HireDate = new DateTime(2018, 3, 1), DepartmentId = 1, PositionId = 5, ManagerId = 1, IsActive = true, CreatedAt = seedTime },
+            new Employee { Id = 1, EmployeeCode = "NV001", FullName = "Nguyễn Hoàng Long", Email = "giamdoc@company.com", PhoneNumber = "0901234567", DateOfBirth = new DateTime(1980, 1, 1), HireDate = new DateTime(2015, 1, 1), DepartmentId = 1, PositionId = 6, ManagerId = null, IsActive = true, CreatedAt = seedTime },
+            new Employee { Id = 2, EmployeeCode = "NV002", FullName = "Trần Thu Hà", Email = "quanly.it@company.com", PhoneNumber = "0901234568", DateOfBirth = new DateTime(1985, 5, 15), HireDate = new DateTime(2018, 3, 1), DepartmentId = 1, PositionId = 5, ManagerId = 1, IsActive = true, CreatedAt = seedTime },
             new Employee { Id = 3, EmployeeCode = "NV003", FullName = "Lê Hoàng Nam", Email = "nam.senior@company.com", PhoneNumber = "0901234569", DateOfBirth = new DateTime(1990, 8, 20), HireDate = new DateTime(2019, 6, 15), DepartmentId = 1, PositionId = 3, ManagerId = 2, IsActive = true, CreatedAt = seedTime },
             new Employee { Id = 4, EmployeeCode = "NV004", FullName = "Phạm Minh Tuấn", Email = "tuan.junior@company.com", PhoneNumber = "0901234570", DateOfBirth = new DateTime(1995, 12, 10), HireDate = new DateTime(2023, 1, 10), DepartmentId = 1, PositionId = 2, ManagerId = 2, IsActive = true, CreatedAt = seedTime },
-            new Employee { Id = 5, EmployeeCode = "NV005", FullName = "Hoàng Thị Hương", Email = "hr@company.com", PhoneNumber = "0901234571", DateOfBirth = new DateTime(1992, 3, 25), HireDate = new DateTime(2020, 2, 1), DepartmentId = 2, PositionId = 3, ManagerId = 1, IsActive = true, CreatedAt = seedTime },
-            new Employee { Id = 6, EmployeeCode = "NV006", FullName = "Đỗ Thị Lan", Email = "lan.intern@company.com", PhoneNumber = "0901234572", DateOfBirth = new DateTime(2001, 7, 30), HireDate = new DateTime(2024, 6, 1), DepartmentId = 1, PositionId = 1, ManagerId = 2, IsActive = true, CreatedAt = seedTime }
+            new Employee { Id = 5, EmployeeCode = "NV005", FullName = "Hoàng Thu Hương", Email = "hr@company.com", PhoneNumber = "0901234571", DateOfBirth = new DateTime(1992, 3, 25), HireDate = new DateTime(2020, 2, 1), DepartmentId = 2, PositionId = 3, ManagerId = 1, IsActive = true, CreatedAt = seedTime },
+            new Employee { Id = 6, EmployeeCode = "NV006", FullName = "Đỗ Ngọc Lan", Email = "lan.intern@company.com", PhoneNumber = "0901234572", DateOfBirth = new DateTime(2001, 7, 30), HireDate = new DateTime(2024, 6, 1), DepartmentId = 1, PositionId = 1, ManagerId = 2, IsActive = true, CreatedAt = seedTime }
         );
 
         // Số dư phép năm 2026: phép năm 12 ngày, nghỉ ốm 30 ngày cho mỗi nhân viên

@@ -18,7 +18,11 @@ export function formatDate(value) {
 
 // Thời điểm (UTC, có hậu tố Z) → hiển thị theo giờ Việt Nam (UTC+7).
 export function formatDateTime(value) {
-  return value ? dateTimeFormatter.format(new Date(value)) : '';
+  if (!value) return '';
+  // Server lưu giờ UTC nhưng JSON không có hậu tố múi giờ → coi là UTC để hiển thị đúng giờ địa phương
+  const text = String(value);
+  const utc = /T/.test(text) && !/(Z|[+-]\d{2}:?\d{2})$/.test(text) ? `${text}Z` : text;
+  return dateTimeFormatter.format(new Date(utc));
 }
 
 export function formatNumber(value) {

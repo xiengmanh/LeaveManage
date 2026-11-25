@@ -101,6 +101,56 @@ public class UserService : IUserService
         return (true, "Đăng ký thành công.", null, MapToResponseDto(user));
     }
 
+    public async Task<ProfileResponseDto?> GetProfileAsync(int userId)
+    {
+        var user = await _userRepository.GetWithEmployeeAsync(userId);
+        return user is null ? null : new ProfileResponseDto
+        {
+            UserId = user.Id,
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role,
+            EmployeeId = user.EmployeeId,
+            EmployeeCode = user.Employee?.EmployeeCode,
+            FullName = user.Employee?.FullName,
+            PhoneNumber = user.Employee?.PhoneNumber
+        };
+    }
+
+    public async Task<(bool IsSuccess, string Message, string? ErrorCode)> ChangePasswordAsync(int userId, ChangePasswordDto request)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null || !user.IsActive) return (false, "Không tìm thấy tài khoản.", "USER_NOT_FOUND");
+        if (!_passwordService.Verify(request.CurrentPassword, user.PasswordHash, user.PasswordSalt))
+            return (false, "Mật khẩu hiện tại không đúng.", "WRONG_PASSWORD");
+        if (request.NewPassword == request.CurrentPassword)
+            return (false, "Mật khẩu mới phải khác mật khẩu hiện tại.", "SAME_PASSWORD");
+
+        _passwordService.CreateHash(request.NewPassword, out var hash, out var salt);
+        user.PasswordHash = hash;
+        user.PasswordSalt = salt;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepository.SaveChangesAsync();
+        // Mật khẩu đổi → mọi JWT/refresh token cũ hết hiệu lực (giống bản sửa P1-02)
+        await _authRepository.RevokeSessionsAsync(userId);
+        return (true, "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.", null);
+    }
+
+    public async Task<(bool IsSuccess, string Message, string? ErrorCode)> UpdatePhoneAsync(int userId, UpdatePhoneDto request)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null || !user.IsActive) return (false, "Không tìm thấy tài khoản.", "USER_NOT_FOUND");
+        if (user.EmployeeId is not int employeeId)
+            return (false, "Tài khoản chưa gắn với nhân viên nên chưa có số điện thoại để cập nhật.", "ACCOUNT_NOT_LINKED");
+
+        var raw = new string((request.PhoneNumber ?? string.Empty).Where(c => !char.IsWhiteSpace(c) && c != '.' && c != '-').ToArray());
+        if (raw.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(raw, @"^(\+84|0)[0-9]{9,10}$"))
+            return (false, "Số điện thoại không hợp lệ (vd: 0901234567 hoặc +84901234567).", "INVALID_PHONE");
+
+        await _userRepository.UpdateEmployeePhoneAsync(employeeId, raw.Length == 0 ? null : raw);
+        return (true, raw.Length == 0 ? "Đã xóa số điện thoại." : "Đã cập nhật số điện thoại.", null);
+    }
+
     public async Task<(
         bool IsSuccess,
         string Message,

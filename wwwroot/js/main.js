@@ -11,6 +11,8 @@ import { renderBalances } from './pages/balances.js';
 import { renderEmployees } from './pages/employees.js';
 import { renderCatalog } from './pages/catalog.js';
 import { renderUsers } from './pages/users.js';
+import { renderProfile } from './pages/profile.js';
+import { renderActivity } from './pages/activity.js';
 
 const app = document.getElementById('app');
 
@@ -24,6 +26,8 @@ addRoute('/balances', renderBalances, { title: 'Số dư phép' });
 addRoute('/employees', renderEmployees, { title: 'Nhân viên' });
 addRoute('/catalog', renderCatalog, { roles: ['Admin'], title: 'Danh mục' });
 addRoute('/users', renderUsers, { roles: ['Admin'], title: 'Tài khoản' });
+addRoute('/activity', renderActivity, { title: 'Nhật ký hoạt động' });
+addRoute('/profile', renderProfile, { title: 'Tài khoản của tôi' });
 
 let activeController = null;
 

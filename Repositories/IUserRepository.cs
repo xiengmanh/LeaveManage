@@ -16,6 +16,8 @@ public interface IUserRepository
     Task<bool> EmployeeExistsAsync(int employeeId);
     /// <summary>Nhân viên đã gắn với tài khoản khác chưa (bỏ qua exceptUserId).</summary>
     Task<bool> IsEmployeeLinkedAsync(int employeeId, int? exceptUserId);
+    Task<User?> GetWithEmployeeAsync(int id);
+    Task UpdateEmployeePhoneAsync(int employeeId, string? phone);
     Task AddAsync(User user);
     void Update(User user);
     void Delete(User user);

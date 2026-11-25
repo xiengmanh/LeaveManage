@@ -34,7 +34,7 @@ builder.Host.UseSerilog((context, services, configuration) =>
 // ===================== SERVICES =====================
 
 // Add services to the container.
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => options.Filters.Add<LeaveManage.Filters.ActivityLogFilter>())
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
@@ -61,6 +61,8 @@ builder.Services.AddScoped<ILeaveRepository, LeaveRepository>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
 builder.Services.AddScoped<ILeaveBalanceService, LeaveBalanceService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
 // Danh mục: một repository generic dùng cho Department, Position, LeaveType
 builder.Services.AddScoped(typeof(ICatalogRepository<>), typeof(CatalogRepository<>));
 builder.Services.AddScoped<ICatalogService, CatalogService>();
@@ -216,7 +218,11 @@ app.Use(async (context, next) =>
 
 // Giao diện web (HTML/CSS/JS thuần + Bootstrap) phục vụ từ wwwroot, cùng origin với API
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    // Luôn hỏi lại server (ETag) để giao diện mới có hiệu lực ngay, không bị kẹt bản JS cũ trong cache
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache"
+});
 
 // Swagger chỉ bật ở Development (không công khai tài liệu API ở Production)
 if (app.Environment.IsDevelopment())

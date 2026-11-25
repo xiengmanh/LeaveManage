@@ -10,7 +10,9 @@ const MENU = [
   { path: '/balances', label: 'Số dư phép', icon: 'piggy-bank' },
   { path: '/employees', label: 'Nhân viên', icon: 'people' },
   { path: '/catalog', label: 'Danh mục', icon: 'collection', roles: ['Admin'] },
-  { path: '/users', label: 'Tài khoản', icon: 'person-gear', roles: ['Admin'] }
+  { path: '/users', label: 'Tài khoản', icon: 'person-gear', roles: ['Admin'] },
+  { path: '/activity', label: 'Nhật ký hoạt động', icon: 'journal-text' },
+  { path: '/profile', label: 'Tài khoản của tôi', icon: 'person-circle' }
 ];
 
 export const ROLE_LABELS = { Admin: 'Quản trị viên', Manager: 'Quản lý', User: 'Nhân viên' };
@@ -64,6 +66,7 @@ function buildShell(root, user, onLogout) {
       h('li', {}, h('span', { class: 'dropdown-item-text small text-secondary' },
         user.employeeId ? `Mã nhân viên liên kết: #${user.employeeId}` : 'Tài khoản chưa gắn nhân viên')),
       h('li', {}, h('hr', { class: 'dropdown-divider' })),
+      h('li', {}, h('a', { class: 'dropdown-item', href: '#/profile' }, icon('person-circle', 'me-2'), 'Tài khoản của tôi')),
       h('li', {}, h('button', { type: 'button', class: 'dropdown-item text-danger', onclick: onLogout }, icon('box-arrow-right', 'me-2'), 'Đăng xuất'))));
 
   const topbar = h('header', { class: 'topbar' },

@@ -120,6 +120,14 @@ public class UserRepository : IUserRepository
         return await _db.SaveChangesAsync() > 0;
     }
 
+    public Task<User?> GetWithEmployeeAsync(int id) =>
+        _db.Users.AsNoTracking().Include(u => u.Employee).FirstOrDefaultAsync(u => u.Id == id);
+
+    public async Task UpdateEmployeePhoneAsync(int employeeId, string? phone) =>
+        await _db.Employees.Where(e => e.Id == employeeId).ExecuteUpdateAsync(s => s
+            .SetProperty(e => e.PhoneNumber, phone)
+            .SetProperty(e => e.UpdatedAt, DateTime.UtcNow));
+
     public Task<bool> EmployeeExistsAsync(int employeeId) =>
         _db.Employees.AnyAsync(employee => employee.Id == employeeId);
 

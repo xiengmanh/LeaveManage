@@ -17,11 +17,13 @@ public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly IAuthService _authService;
+    private readonly IActivityLogService _activityLog;
 
-    public UsersController(IUserService userService, IAuthService authService)
+    public UsersController(IUserService userService, IAuthService authService, IActivityLogService activityLog)
     {
         _userService = userService;
         _authService = authService;
+        _activityLog = activityLog;
     }
 
     /// <summary>Lấy danh sách tài khoản.</summary>
@@ -76,14 +78,19 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> Login([FromBody] UserLoginDto request)
     {
         var tokens = await _authService.LoginAsync(request);
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
         if (tokens is null)
         {
+            await _activityLog.LogAsync(null, request.Username.Trim(), "Đăng nhập thất bại", "POST", Request.Path, StatusCodes.Status401Unauthorized, ip);
             return Unauthorized(CreateError(
                 "Sai tên đăng nhập hoặc mật khẩu, hoặc tài khoản đã bị khóa.",
                 "INVALID_CREDENTIALS"));
         }
 
+        var subject = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(tokens.Token)
+            .Claims.FirstOrDefault(c => c.Type is ClaimTypes.NameIdentifier or "nameid")?.Value;
+        await _activityLog.LogAsync(int.TryParse(subject, out var uid) ? uid : null, tokens.Username, "Đăng nhập", "POST", Request.Path, StatusCodes.Status200OK, ip);
         return Ok(tokens);
     }
 
@@ -126,6 +133,30 @@ public class UsersController : ControllerBase
             Age = age,
             EmployeeId = employeeId
         });
+    }
+
+    /// <summary>Thông tin tài khoản và nhân viên của chính mình.</summary>
+    [HttpGet("me/profile")]
+    public async Task<IActionResult> Profile()
+    {
+        var profile = await _userService.GetProfileAsync(CallerContext.From(User).UserId);
+        return profile is null ? NotFound(CreateError("Không tìm thấy tài khoản.", "USER_NOT_FOUND")) : Ok(profile);
+    }
+
+    /// <summary>Đổi mật khẩu của chính mình (mọi vai trò). Các phiên đăng nhập cũ bị thu hồi.</summary>
+    [HttpPut("me/password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request)
+    {
+        var result = await _userService.ChangePasswordAsync(CallerContext.From(User).UserId, request);
+        return result.IsSuccess ? Ok(SuccessResponse.Ok(result.Message)) : MapFailure(result.Message, result.ErrorCode);
+    }
+
+    /// <summary>Đổi số điện thoại của chính mình (mọi vai trò có hồ sơ nhân viên).</summary>
+    [HttpPut("me/phone")]
+    public async Task<IActionResult> UpdatePhone([FromBody] UpdatePhoneDto request)
+    {
+        var result = await _userService.UpdatePhoneAsync(CallerContext.From(User).UserId, request);
+        return result.IsSuccess ? Ok(SuccessResponse.Ok(result.Message)) : MapFailure(result.Message, result.ErrorCode);
     }
 
     /// <summary>Endpoint minh họa Custom MinimumAgeRequirement.</summary>
@@ -187,6 +218,7 @@ public class UsersController : ControllerBase
         return errorCode switch
         {
             "USER_NOT_FOUND" or "EMPLOYEE_NOT_FOUND" => NotFound(error),
+            "ACCOUNT_NOT_LINKED" => StatusCode(StatusCodes.Status403Forbidden, error),
             "USER_ALREADY_EXISTS" or "EMPLOYEE_ALREADY_LINKED" => Conflict(error),
             _ => BadRequest(error)
         };

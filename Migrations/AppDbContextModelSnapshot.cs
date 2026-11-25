@@ -22,6 +22,61 @@ namespace LeaveManage.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("LeaveManage.Models.ActivityLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<bool>("IsSuccess")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Username");
+
+                    b.ToTable("ActivityLogs");
+                });
+
             modelBuilder.Entity("LeaveManage.Models.Department", b =>
                 {
                     b.Property<int>("Id")
@@ -172,7 +227,7 @@ namespace LeaveManage.Migrations
                             DepartmentId = 1,
                             Email = "giamdoc@company.com",
                             EmployeeCode = "NV001",
-                            FullName = "Nguyễn Văn Giám Đốc",
+                            FullName = "Nguyễn Hoàng Long",
                             HireDate = new DateTime(2015, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             IsActive = true,
                             PhoneNumber = "0901234567",
@@ -186,7 +241,7 @@ namespace LeaveManage.Migrations
                             DepartmentId = 1,
                             Email = "quanly.it@company.com",
                             EmployeeCode = "NV002",
-                            FullName = "Trần Thị Quản Lý",
+                            FullName = "Trần Thu Hà",
                             HireDate = new DateTime(2018, 3, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             IsActive = true,
                             ManagerId = 1,
@@ -231,7 +286,7 @@ namespace LeaveManage.Migrations
                             DepartmentId = 2,
                             Email = "hr@company.com",
                             EmployeeCode = "NV005",
-                            FullName = "Hoàng Thị Hương",
+                            FullName = "Hoàng Thu Hương",
                             HireDate = new DateTime(2020, 2, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             IsActive = true,
                             ManagerId = 1,
@@ -246,7 +301,7 @@ namespace LeaveManage.Migrations
                             DepartmentId = 1,
                             Email = "lan.intern@company.com",
                             EmployeeCode = "NV006",
-                            FullName = "Đỗ Thị Lan",
+                            FullName = "Đỗ Ngọc Lan",
                             HireDate = new DateTime(2024, 6, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             IsActive = true,
                             ManagerId = 2,

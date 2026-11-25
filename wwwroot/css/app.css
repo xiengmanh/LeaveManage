@@ -417,6 +417,7 @@ a {
 .badge-soft-secondary { background: #eef1f6; color: #4a5568; }
 .badge-soft-primary { background: #e9effc; color: #1f4bbd; }
 .badge-soft-warning { background: #fdf1e3; color: #94460a; }
+.badge-soft-info { background: #e1f3f8; color: #0b5a70; }
 
 /* ---------- Bảng dữ liệu ---------- */
 .table-card {
