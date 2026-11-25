@@ -190,6 +190,21 @@ var app = builder.Build();
 
 app.UseRequestLogging();
 app.UseExceptionHandling();
+// Header bảo mật cho giao diện web (wwwroot). Swagger UI cần script inline nên không áp CSP cho /swagger.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "no-referrer";
+    if (!context.Request.Path.StartsWithSegments("/swagger"))
+        headers["Content-Security-Policy"] =
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    await next();
+});
+
+// Giao diện web (HTML/CSS/JS thuần + Bootstrap) phục vụ từ wwwroot, cùng origin với API
+app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // Swagger chỉ bật ở Development (không công khai tài liệu API ở Production)
