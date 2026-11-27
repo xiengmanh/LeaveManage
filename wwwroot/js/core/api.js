@@ -1,4 +1,4 @@
-import { clearSession, getRefreshToken, getToken, saveSession } from './session.js';
+import { clearSession, getToken, getSession, saveSession } from './session.js';
 
 // Lỗi từ API. Backend trả { statusCode, message, errorCode, traceId } (middleware)
 // hoặc ProblemDetails { title, errors } khi dữ liệu không hợp lệ (400).
@@ -27,14 +27,13 @@ export class ApiError extends Error {
 
 let refreshing = null;
 
-// Access token hết hạn → dùng refresh token xin cặp token mới (chỉ 1 request refresh tại một thời điểm)
+// Access token hết hạn → gọi refresh; trình duyệt tự gửi cookie HttpOnly lm_refresh (chỉ 1 request tại một thời điểm)
 async function tryRefresh() {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
+  if (!getSession()) return false;
   refreshing ??= fetch('/api/users/refresh', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ refreshToken })
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' }
   }).then(async (response) => {
     if (!response.ok) return false;
     saveSession(await response.json());

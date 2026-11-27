@@ -151,6 +151,32 @@ builder.Services.AddCors(options =>
     });
 });
 
+// ===================== RATE LIMITING =====================
+// Giới hạn đăng nhập/làm mới phiên theo IP (chống dò mật khẩu, spam refresh). Số request/phút cấu hình ở RateLimit:AuthPerMinute.
+var authPerMinute = builder.Configuration.GetValue<int>("RateLimit:AuthPerMinute", 20);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.Headers.RetryAfter = "60";
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            Message = "Quá nhiều yêu cầu đăng nhập hoặc làm mới phiên. Vui lòng thử lại sau ít phút.",
+            ErrorCode = "RATE_LIMIT_EXCEEDED"
+        }, cancellationToken: token);
+    };
+    options.AddPolicy(LeaveManage.Constants.RateLimitPolicies.Auth, httpContext =>
+        System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                PermitLimit = authPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
 // ===================== SWAGGER CONFIGURATION =====================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -258,6 +284,7 @@ app.UseSwaggerUI(c =>
 
 app.UseCors("Frontend");
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

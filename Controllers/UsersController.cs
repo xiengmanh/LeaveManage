@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using LeaveManage.Authentication;
 using LeaveManage.Constants;
 using LeaveManage.DTOs.Common;
 using LeaveManage.DTOs.Requests;
@@ -6,6 +7,7 @@ using LeaveManage.DTOs.Responses;
 using LeaveManage.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ApiErrorResponse = LeaveManage.DTOs.Responses.ErrorResponse;
 
 namespace LeaveManage.Controllers;
@@ -75,6 +77,7 @@ public class UsersController : ControllerBase
     /// <summary>Kiểm tra thông tin đăng nhập.</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     public async Task<IActionResult> Login([FromBody] UserLoginDto request)
     {
         var tokens = await _authService.LoginAsync(request);
@@ -91,26 +94,38 @@ public class UsersController : ControllerBase
         var subject = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(tokens.Token)
             .Claims.FirstOrDefault(c => c.Type is ClaimTypes.NameIdentifier or "nameid")?.Value;
         await _activityLog.LogAsync(int.TryParse(subject, out var uid) ? uid : null, tokens.Username, "Đăng nhập", "POST", Request.Path, StatusCodes.Status200OK, ip);
+        RefreshTokenCookie.Append(Response, tokens);
         return Ok(tokens);
     }
 
-    /// <summary>Đổi Refresh Token hợp lệ lấy một cặp token mới.</summary>
+    /// <summary>Đổi Refresh Token (đọc từ cookie HttpOnly lm_refresh) lấy một cặp token mới.</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]
-    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequestDto request)
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    public async Task<IActionResult> Refresh()
     {
-        var tokens = await _authService.RefreshTokenAsync(request.RefreshToken);
-        return tokens is null
-            ? Unauthorized(CreateError("Refresh Token không hợp lệ hoặc đã hết hạn.", "INVALID_REFRESH_TOKEN"))
-            : Ok(tokens);
+        var refreshToken = Request.Cookies[RefreshTokenCookie.Name];
+        var tokens = string.IsNullOrEmpty(refreshToken)
+            ? null
+            : await _authService.RefreshTokenAsync(refreshToken);
+
+        if (tokens is null)
+        {
+            RefreshTokenCookie.Delete(Response);
+            return Unauthorized(CreateError("Refresh Token không hợp lệ hoặc đã hết hạn.", "INVALID_REFRESH_TOKEN"));
+        }
+
+        RefreshTokenCookie.Append(Response, tokens);
+        return Ok(tokens);
     }
 
-    /// <summary>Đăng xuất: thu hồi refresh token của tài khoản hiện tại.</summary>
+    /// <summary>Đăng xuất: thu hồi refresh token của tài khoản hiện tại và xóa cookie.</summary>
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
         if (int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             await _authService.LogoutAsync(userId);
+        RefreshTokenCookie.Delete(Response);
         return NoContent();
     }
 

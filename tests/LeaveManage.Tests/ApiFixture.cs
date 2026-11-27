@@ -20,6 +20,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    public const string RefreshCookieName = "lm_refresh";
+
     private static string ConnectionString(string database) =>
         $"Server={SqlServerInstance};Database={database};Trusted_Connection=True;TrustServerCertificate=True";
 
@@ -30,6 +32,9 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Jwt:Key", "test-only-key-0123456789-abcdefghijklmnopqrstuvwxyz");
         builder.UseSetting("Seed:Enabled", "true");
         builder.UseSetting("Seed:DemoPassword", DemoPassword);
+        // Test chạy nhiều đăng nhập/làm mới liên tiếp; nâng giới hạn để không đụng rate limit.
+        // Riêng test rate limit tự tạo app với giới hạn thấp.
+        builder.UseSetting("RateLimit:AuthPerMinute", "100000");
     }
 
     public async Task InitializeAsync()
@@ -64,6 +69,28 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", body.GetProperty("token").GetString());
         return client;
+    }
+
+    /// <summary>Giá trị cookie lm_refresh (dạng đã mã hóa, gửi lại nguyên văn) từ header Set-Cookie; null nếu không có.</summary>
+    public static string? RefreshCookie(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues("Set-Cookie", out var values)) return null;
+        foreach (var value in values)
+        {
+            var pair = value.Split(';')[0];
+            if (pair.StartsWith(RefreshCookieName + "=", StringComparison.Ordinal))
+                return pair[(RefreshCookieName.Length + 1)..];
+        }
+        return null;
+    }
+
+    /// <summary>Request làm mới phiên, gửi refresh token qua cookie như trình duyệt sẽ làm.</summary>
+    public static HttpRequestMessage RefreshRequest(string? refreshToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/users/refresh");
+        if (refreshToken is not null)
+            request.Headers.Add("Cookie", $"{RefreshCookieName}={refreshToken}");
+        return request;
     }
 
     /// <summary>Ngày làm việc (T2–T6) gần nhất kể từ hôm nay + offset ngày.</summary>

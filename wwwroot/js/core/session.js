@@ -1,11 +1,11 @@
 // Phiên đăng nhập lưu trong sessionStorage: tự mất khi đóng tab, không chia sẻ giữa các tab.
-// Gồm access token (JWT), refresh token và thông tin hiển thị (username, role, employeeId).
+// Gồm access token (JWT) và thông tin hiển thị (username, role, employeeId).
+// Refresh token KHÔNG lưu ở đây: server đặt nó trong cookie HttpOnly (lm_refresh), JS không đọc được.
 const SESSION_KEY = 'leavemanage.session';
 
 export function saveSession(authResponse) {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({
     token: authResponse.token,
-    refreshToken: authResponse.refreshToken,
     expiresAt: authResponse.expiresAt,
     user: {
       username: authResponse.username,
@@ -26,10 +26,6 @@ export function getSession() {
 
 export function getToken() {
   return getSession()?.token ?? null;
-}
-
-export function getRefreshToken() {
-  return getSession()?.refreshToken ?? null;
 }
 
 export function getUser() {

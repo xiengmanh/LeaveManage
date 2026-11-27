@@ -32,14 +32,14 @@ public class AuthTests
     [Fact]
     public async Task Refresh_RotatesToken_OldTokenRejected()
     {
-        var client = _api.CreateClient();
-        var login = await (await client.PostAsJsonAsync("/api/users/login", new { username = "nv004", password = ApiFixture.DemoPassword }))
-            .Content.ReadFromJsonAsync<JsonElement>();
-        var oldRefresh = login.GetProperty("refreshToken").GetString();
+        var login = await _api.CreateClient().PostAsJsonAsync("/api/users/login", new { username = "nv004", password = ApiFixture.DemoPassword });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var oldRefresh = ApiFixture.RefreshCookie(login);
+        Assert.NotNull(oldRefresh);
 
-        var first = await client.PostAsJsonAsync("/api/users/refresh", new { refreshToken = oldRefresh });
+        var first = await _api.CreateClient().SendAsync(ApiFixture.RefreshRequest(oldRefresh));
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-        var reuse = await client.PostAsJsonAsync("/api/users/refresh", new { refreshToken = oldRefresh });
+        var reuse = await _api.CreateClient().SendAsync(ApiFixture.RefreshRequest(oldRefresh));
         Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
     }
 

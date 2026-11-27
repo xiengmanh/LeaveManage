@@ -61,7 +61,7 @@ public class RegressionTests
         var response = await _api.CreateClient().PostAsJsonAsync("/api/users/login", new { username, password = ApiFixture.DemoPassword });
         if (!response.IsSuccessStatusCode) return (response.StatusCode, null, null);
         var body = await Json(response);
-        return (response.StatusCode, body.GetProperty("token").GetString(), body.GetProperty("refreshToken").GetString());
+        return (response.StatusCode, body.GetProperty("token").GetString(), ApiFixture.RefreshCookie(response));
     }
 
     private HttpClient ClientWithToken(string? token)
@@ -72,7 +72,7 @@ public class RegressionTests
     }
 
     private async Task<HttpResponseMessage> RefreshAsync(string? refreshToken) =>
-        await _api.CreateClient().PostAsJsonAsync("/api/users/refresh", new { refreshToken });
+        await _api.CreateClient().SendAsync(ApiFixture.RefreshRequest(refreshToken));
 
     /// <summary>(Pending, Used) của nhân viên theo loại nghỉ trong năm hiện tại, đọc bằng tài khoản Admin.</summary>
     private static async Task<(int Pending, int Used)> BalanceAsync(HttpClient admin, int employeeId, int leaveTypeId)
@@ -273,7 +273,7 @@ public class RegressionTests
             var winner = await Json(winners[0]);
             Assert.Equal(HttpStatusCode.OK, (await ClientWithToken(winner.GetProperty("token").GetString()).GetAsync("/api/users/me")).StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(refresh)).StatusCode);               // token cũ không dùng lại
-            Assert.Equal(HttpStatusCode.OK, (await RefreshAsync(winner.GetProperty("refreshToken").GetString())).StatusCode); // token mới dùng được
+            Assert.Equal(HttpStatusCode.OK, (await RefreshAsync(ApiFixture.RefreshCookie(winners[0]))).StatusCode); // token mới dùng được
         }
     }
 
@@ -325,7 +325,7 @@ public class RegressionTests
         {
             var issued = await Json(refreshResponse);
             Assert.Equal(HttpStatusCode.Unauthorized, (await ClientWithToken(issued.GetProperty("token").GetString()).GetAsync("/api/users/me")).StatusCode);
-            Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(issued.GetProperty("refreshToken").GetString())).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(ApiFixture.RefreshCookie(refreshResponse))).StatusCode);
         }
         Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(oldRefresh)).StatusCode);
     }

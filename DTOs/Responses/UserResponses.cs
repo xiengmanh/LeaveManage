@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LeaveManage.DTOs.Responses;
 
 public class UserResponseDto
@@ -17,7 +19,14 @@ public class UserResponseDto
 public class AuthResponseDto
 {
     public string Token { get; set; } = string.Empty;
+
+    // Refresh token chỉ đi qua cookie HttpOnly (xem RefreshTokenCookie), không trả trong body JSON.
+    [JsonIgnore]
     public string RefreshToken { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public DateTime RefreshTokenExpiresAt { get; set; }
+
     public DateTime ExpiresAt { get; set; }
     public string Username { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;

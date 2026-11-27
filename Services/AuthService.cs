@@ -43,7 +43,7 @@ public class AuthService : IAuthService
         if (!await _authRepository.TryStoreRefreshTokenAsync(user.Id, user.TokenVersion, refreshHash, refreshExpiresAt))
             return null;
 
-        return BuildResponse(user, refreshToken);
+        return BuildResponse(user, refreshToken, refreshExpiresAt);
     }
 
     public async Task<AuthResponseDto?> RefreshTokenAsync(string refreshToken)
@@ -52,7 +52,7 @@ public class AuthService : IAuthService
         // Rotation nguyên tử ở Repository: chỉ một request thắng; token cũ không dùng lại được
         var user = await _authRepository.RotateRefreshTokenAsync(
             HashRefreshToken(refreshToken), newHash, newExpiresAt, DateTime.UtcNow);
-        return user is null ? null : BuildResponse(user, newToken);
+        return user is null ? null : BuildResponse(user, newToken, newExpiresAt);
     }
 
     /// <summary>Đăng xuất: xóa refresh token và tăng TokenVersion → access JWT cũ cũng bị từ chối.</summary>
@@ -81,7 +81,7 @@ public class AuthService : IAuthService
         return (token, HashRefreshToken(token), DateTime.UtcNow.AddDays(refreshTokenDays));
     }
 
-    private AuthResponseDto BuildResponse(User user, string refreshToken)
+    private AuthResponseDto BuildResponse(User user, string refreshToken, DateTime refreshExpiresAt)
     {
         var expiresInMinutes = _configuration.GetSection("Jwt").GetValue<int>("ExpiresInMinutes", 60);
         var accessTokenExpiresAt = DateTime.UtcNow.AddMinutes(expiresInMinutes);
@@ -89,6 +89,7 @@ public class AuthService : IAuthService
         {
             Token = GenerateJwtToken(user, accessTokenExpiresAt),
             RefreshToken = refreshToken,
+            RefreshTokenExpiresAt = refreshExpiresAt,
             ExpiresAt = accessTokenExpiresAt,
             Username = user.Username,
             Role = user.Role,
