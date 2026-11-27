@@ -356,7 +356,7 @@ public class LeaveRequestService : ILeaveRequestService
     }
 
     /// <summary>Ngoài phạm vi được xem thì báo 404 (không tiết lộ đơn có tồn tại).</summary>
-    private static void EnsureVisible(LeaveRequest? request, CallerContext caller)
+    internal static void EnsureVisible(LeaveRequest? request, CallerContext caller)
     {
         if (request is null)
             throw new NotFoundException("Không tìm thấy đơn nghỉ.", "LEAVE_REQUEST_NOT_FOUND");
@@ -368,7 +368,7 @@ public class LeaveRequestService : ILeaveRequestService
             throw new NotFoundException("Không tìm thấy đơn nghỉ.", "LEAVE_REQUEST_NOT_FOUND");
     }
 
-    private static void EnsureOwner(LeaveRequest? request, CallerContext caller)
+    internal static void EnsureOwner(LeaveRequest? request, CallerContext caller)
     {
         EnsureVisible(request, caller);
         if (request!.EmployeeId != caller.EmployeeId)

@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<Holiday> Holidays => Set<Holiday>();
+    public DbSet<LeaveAttachment> LeaveAttachments => Set<LeaveAttachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,6 +94,16 @@ public class AppDbContext : DbContext
                   .WithMany(t => t.LeaveRequests)
                   .HasForeignKey(r => r.LeaveTypeId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<LeaveAttachment>(entity =>
+        {
+            entity.HasIndex(a => a.LeaveRequestId);
+            entity.Property(a => a.Content).HasColumnType("varbinary(max)");
+            entity.HasOne(a => a.LeaveRequest)
+                  .WithMany()
+                  .HasForeignKey(a => a.LeaveRequestId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ===== LEAVE BALANCE: mỗi nhân viên có 1 dòng / loại nghỉ / năm =====

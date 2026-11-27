@@ -377,6 +377,44 @@ namespace LeaveManage.Migrations
                     b.ToTable("LeaveApprovals");
                 });
 
+            modelBuilder.Entity("LeaveManage.Models.LeaveAttachment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("LeaveRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeaveRequestId");
+
+                    b.ToTable("LeaveAttachments");
+                });
+
             modelBuilder.Entity("LeaveManage.Models.LeaveBalance", b =>
                 {
                     b.Property<int>("Id")
@@ -1013,6 +1051,17 @@ namespace LeaveManage.Migrations
                         .IsRequired();
 
                     b.Navigation("Approver");
+
+                    b.Navigation("LeaveRequest");
+                });
+
+            modelBuilder.Entity("LeaveManage.Models.LeaveAttachment", b =>
+                {
+                    b.HasOne("LeaveManage.Models.LeaveRequest", "LeaveRequest")
+                        .WithMany()
+                        .HasForeignKey("LeaveRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("LeaveRequest");
                 });

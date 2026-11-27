@@ -59,6 +59,8 @@ builder.Services.AddScoped<IFileService, FileService>();
 // Nghiệp vụ nghỉ phép
 builder.Services.AddScoped<ILeaveRepository, LeaveRepository>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
+builder.Services.AddScoped<ILeaveAttachmentRepository, LeaveAttachmentRepository>();
+builder.Services.AddScoped<ILeaveAttachmentService, LeaveAttachmentService>();
 builder.Services.AddScoped<ILeaveBalanceService, LeaveBalanceService>();
 builder.Services.AddScoped<ILeaveExpiryService, LeaveExpiryService>();
 builder.Services.AddScoped<IHolidayRepository, HolidayRepository>();

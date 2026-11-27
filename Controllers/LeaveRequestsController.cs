@@ -19,10 +19,12 @@ namespace LeaveManage.Controllers;
 public class LeaveRequestsController : ControllerBase
 {
     private readonly ILeaveRequestService _service;
+    private readonly ILeaveAttachmentService _attachmentService;
 
-    public LeaveRequestsController(ILeaveRequestService service)
+    public LeaveRequestsController(ILeaveRequestService service, ILeaveAttachmentService attachmentService)
     {
         _service = service;
+        _attachmentService = attachmentService;
     }
 
     private CallerContext Caller => CallerContext.From(User);
@@ -81,6 +83,39 @@ public class LeaveRequestsController : ControllerBase
     [HttpPost("{id:int}/cancel")]
     public async Task<ActionResult<LeaveRequestResponse>> Cancel(int id, [FromBody] CancelLeaveDto? dto) =>
         Ok(await _service.CancelAsync(id, dto ?? new CancelLeaveDto(), Caller));
+
+    /// <summary>Danh sách tệp đính kèm của đơn (trong phạm vi được xem).</summary>
+    [HttpGet("{id:int}/attachments")]
+    public async Task<ActionResult<List<LeaveAttachmentResponse>>> ListAttachments(int id) =>
+        Ok(await _attachmentService.ListAsync(id, Caller));
+
+    /// <summary>Tải tệp đính kèm (trong phạm vi được xem).</summary>
+    [HttpGet("{id:int}/attachments/{attachmentId:int}")]
+    public async Task<IActionResult> DownloadAttachment(int id, int attachmentId)
+    {
+        var file = await _attachmentService.DownloadAsync(id, attachmentId, Caller);
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    /// <summary>Đính kèm tệp (PDF/JPG/PNG tối đa 5MB, tối đa 5 tệp/đơn). Chỉ khi đơn Nháp hoặc Chờ duyệt.</summary>
+    [HttpPost("{id:int}/attachments")]
+    [Authorize(Policy = AuthorizationPolicies.HasEmployee)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(LeaveAttachmentResponse), StatusCodes.Status201Created)]
+    public async Task<ActionResult<LeaveAttachmentResponse>> UploadAttachment(int id, IFormFile file)
+    {
+        var created = await _attachmentService.UploadAsync(id, file, Caller);
+        return CreatedAtAction(nameof(DownloadAttachment), new { id, attachmentId = created.Id }, created);
+    }
+
+    /// <summary>Xóa tệp đính kèm (chỉ chủ đơn, khi đơn Nháp hoặc Chờ duyệt).</summary>
+    [HttpDelete("{id:int}/attachments/{attachmentId:int}")]
+    [Authorize(Policy = AuthorizationPolicies.HasEmployee)]
+    public async Task<IActionResult> DeleteAttachment(int id, int attachmentId)
+    {
+        await _attachmentService.DeleteAsync(id, attachmentId, Caller);
+        return NoContent();
+    }
 }
 
 /// <summary>Lịch sử duyệt/từ chối.</summary>
