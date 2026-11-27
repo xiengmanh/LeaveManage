@@ -21,4 +21,10 @@ public interface IAuthRepository
 
     /// <summary>Thu hồi mọi phiên: xóa refresh token và tăng TokenVersion (JWT cũ bị từ chối).</summary>
     Task RevokeSessionsAsync(int userId);
+
+    /// <summary>
+    /// Thay bản băm mật khẩu cũ bằng bản mới (nâng cấp khi đăng nhập). Chỉ ghi nếu bản băm trong DB vẫn là
+    /// bản vừa đọc (oldHash), tránh ghi đè khi đổi mật khẩu đồng thời.
+    /// </summary>
+    Task<bool> TryUpgradePasswordHashAsync(int userId, byte[] oldHash, byte[] newHash, byte[] newSalt);
 }

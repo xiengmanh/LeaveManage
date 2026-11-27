@@ -54,6 +54,16 @@ public class AuthRepository : IAuthRepository
         return user;
     }
 
+    public async Task<bool> TryUpgradePasswordHashAsync(int userId, byte[] oldHash, byte[] newHash, byte[] newSalt)
+    {
+        var rows = await _context.Users
+            .Where(user => user.Id == userId && user.PasswordHash == oldHash)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(user => user.PasswordHash, newHash)
+                .SetProperty(user => user.PasswordSalt, newSalt));
+        return rows == 1;
+    }
+
     public Task RevokeSessionsAsync(int userId) =>
         _context.Users
             .Where(user => user.Id == userId)

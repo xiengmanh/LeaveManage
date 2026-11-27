@@ -31,6 +31,13 @@ public class AuthService : IAuthService
         if (user is null || !user.IsActive || !_passwordService.Verify(request.Password, user.PasswordHash, user.PasswordSalt))
             return null;
 
+        // Mật khẩu đúng nhưng còn băm theo cơ chế cũ → băm lại theo chuẩn mới (lỗi ở bước này không chặn đăng nhập)
+        if (_passwordService.IsLegacyHash(user.PasswordSalt))
+        {
+            _passwordService.CreateHash(request.Password, out var newHash, out var newSalt);
+            await _authRepository.TryUpgradePasswordHashAsync(user.Id, user.PasswordHash, newHash, newSalt);
+        }
+
         var (refreshToken, refreshHash, refreshExpiresAt) = CreateRefreshToken();
         // Chỉ lưu khi tài khoản vẫn hoạt động và chưa bị thu hồi phiên giữa chừng
         if (!await _authRepository.TryStoreRefreshTokenAsync(user.Id, user.TokenVersion, refreshHash, refreshExpiresAt))
