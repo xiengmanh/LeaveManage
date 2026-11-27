@@ -43,7 +43,7 @@ public class ExceptionHandlingMiddleware
         HttpContext context,
         Exception exception)
     {
-        var (statusCode, message, errorCode) = MapException(exception);
+        var (statusCode, message, errorCode, errors) = MapException(exception);
 
         if (statusCode >= StatusCodes.Status500InternalServerError)
         {
@@ -54,11 +54,11 @@ public class ExceptionHandlingMiddleware
                 context.Request.Method,
                 context.Request.Path);
         }
-        else
+        else if (statusCode >= StatusCodes.Status400BadRequest)
         {
             _logger.LogWarning(
                 exception,
-                "Handled exception {StatusCode}. TraceId={TraceId} {Method} {Path}",
+                "Client error {StatusCode}. TraceId={TraceId} {Method} {Path}",
                 statusCode,
                 context.TraceIdentifier,
                 context.Request.Method,
@@ -70,6 +70,7 @@ public class ExceptionHandlingMiddleware
             StatusCode = statusCode,
             Message = message,
             ErrorCode = errorCode,
+            Errors = errors,
             Detail = _environment.IsDevelopment() && statusCode >= StatusCodes.Status500InternalServerError
                 ? exception.ToString()
                 : null,
@@ -84,28 +85,32 @@ public class ExceptionHandlingMiddleware
             JsonSerializer.Serialize(response, JsonOptions));
     }
 
-    private static (int StatusCode, string Message, string? ErrorCode) MapException(
+    private static (int StatusCode, string Message, string? ErrorCode, Dictionary<string, List<string>>? Errors) MapException(
         Exception exception)
     {
         return exception switch
         {
             AppException appException =>
-                (appException.StatusCode, appException.Message, appException.ErrorCode),
-            // Hai request cùng sửa một dòng (rowversion/điều kiện cập nhật) → 409 thay vì 500
+                (appException.StatusCode, appException.Message, appException.ErrorCode, null),
+            BadHttpRequestException badReq =>
+                (StatusCodes.Status400BadRequest, badReq.Message, "BAD_REQUEST", null),
+            // Validation errors from model binding (e.g., [Required], [Range], [StringLength])
+            InvalidOperationException { Message: var msg } when msg.Contains("validation", StringComparison.OrdinalIgnoreCase) =>
+                (StatusCodes.Status400BadRequest, msg, "VALIDATION_ERROR", null),
+            // Hai request cùng sửa một dòng (rowversion) → 409
             DbUpdateConcurrencyException =>
-                (StatusCodes.Status409Conflict, "Dữ liệu đã bị thay đổi bởi thao tác khác. Vui lòng tải lại.", "CONCURRENCY_CONFLICT"),
+                (StatusCodes.Status409Conflict, "Dữ liệu đã bị thay đổi bởi thao tác khác. Vui lòng tải lại.", "CONCURRENCY_CONFLICT", null),
             // Vi phạm unique index (2601/2627) → 409
             DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } } =>
-                (StatusCodes.Status409Conflict, "Dữ liệu bị trùng với bản ghi đã có.", "DUPLICATE"),
+                (StatusCodes.Status409Conflict, "Dữ liệu bị trùng với bản ghi đã có.", "DUPLICATE", null),
             // Vi phạm khóa ngoại/check constraint (547) → 409
             DbUpdateException { InnerException: SqlException { Number: 547 } } =>
-                (StatusCodes.Status409Conflict, "Dữ liệu đang được tham chiếu hoặc vi phạm ràng buộc.", "CONSTRAINT_VIOLATION"),
-            BadHttpRequestException =>
-                (StatusCodes.Status400BadRequest, "Request không hợp lệ.", "BAD_REQUEST"),
+                (StatusCodes.Status409Conflict, "Dữ liệu đang được tham chiếu hoặc vi phạm ràng buộc.", "CONSTRAINT_VIOLATION", null),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.",
-                "INTERNAL_ERROR")
+                "INTERNAL_ERROR",
+                null)
         };
     }
 }

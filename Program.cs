@@ -34,7 +34,11 @@ builder.Host.UseSerilog((context, services, configuration) =>
 // ===================== SERVICES =====================
 
 // Add services to the container.
-builder.Services.AddControllers(options => options.Filters.Add<LeaveManage.Filters.ActivityLogFilter>())
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<LeaveManage.Filters.ActivityLogFilter>();
+    options.Filters.Add<LeaveManage.Filters.ValidationExceptionFilter>();
+})
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
