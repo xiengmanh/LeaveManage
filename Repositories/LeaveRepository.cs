@@ -123,6 +123,12 @@ public class LeaveRepository : ILeaveRepository
         return rows.Select(r => (r.Id, r.EmployeeId)).ToList();
     }
 
+    public Task<List<DateTime>> GetHolidayDatesAsync(DateTime start, DateTime end) =>
+        _context.Holidays.AsNoTracking()
+            .Where(h => h.Date >= start.Date && h.Date <= end.Date)
+            .Select(h => h.Date)
+            .ToListAsync();
+
     public Task<bool> HasOverlapAsync(int employeeId, DateTime start, DateTime end, int excludeRequestId) =>
         // Hai khoảng [s1,e1] và [s2,e2] giao nhau khi s1 <= e2 và s2 <= e1
         _context.LeaveRequests.AnyAsync(r => r.EmployeeId == employeeId

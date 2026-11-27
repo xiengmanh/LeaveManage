@@ -32,6 +32,10 @@ public interface ILeaveRepository
     /// <summary>Các đơn Pending có ngày bắt đầu trước cutoff, dạng (RequestId, EmployeeId).</summary>
     Task<List<(int RequestId, int EmployeeId)>> GetOverduePendingRequestKeysAsync(DateTime cutoff);
     Task<bool> HasOverlapAsync(int employeeId, DateTime start, DateTime end, int excludeRequestId);
+
+    // ---------- Holiday ----------
+    /// <summary>Các ngày lễ nằm trong khoảng [start, end].</summary>
+    Task<List<DateTime>> GetHolidayDatesAsync(DateTime start, DateTime end);
     Task<int> SumDaysInYearAsync(int employeeId, int leaveTypeId, int year, int excludeRequestId);
     Task AddRequestAsync(LeaveRequest request);
 

@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+    public DbSet<Holiday> Holidays => Set<Holiday>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,11 @@ public class AppDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(user => user.EmployeeId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Holiday>(entity =>
+        {
+            entity.HasIndex(h => h.Date).IsUnique();
         });
 
         modelBuilder.Entity<ActivityLog>(entity =>

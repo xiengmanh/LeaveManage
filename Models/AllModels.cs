@@ -316,3 +316,24 @@ public enum ApprovalStatus
     Rejected = 2,
     Skipped = 3
 }
+
+// ==================== HOLIDAY (NGÀY LỄ) ====================
+
+/// <summary>
+/// Ngày nghỉ lễ không tính vào số ngày phép. Mỗi ngày chỉ có một dòng.
+/// </summary>
+public class Holiday
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public int Id { get; set; }
+
+    [Required]
+    public DateTime Date { get; set; }
+
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

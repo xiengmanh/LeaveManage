@@ -325,7 +325,8 @@ public class LeaveRequestService : ILeaveRequestService
 
         EnsureNotice(leaveType, start);
 
-        var days = LeaveDayCalculator.CountWorkingDays(start, end);
+        var holidays = await _repository.GetHolidayDatesAsync(start, end);
+        var days = LeaveDayCalculator.CountWorkingDays(start, end, holidays);
         if (days == 0)
             throw new BadRequestException("Khoảng nghỉ không có ngày làm việc nào (chỉ gồm Thứ 7/Chủ nhật).", "NO_WORKING_DAYS");
         if (leaveType.DefaultDaysPerYear is int limit && days > limit)
