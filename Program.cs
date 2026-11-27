@@ -60,6 +60,8 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<ILeaveRepository, LeaveRepository>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
 builder.Services.AddScoped<ILeaveBalanceService, LeaveBalanceService>();
+builder.Services.AddScoped<ILeaveExpiryService, LeaveExpiryService>();
+builder.Services.AddHostedService<LeaveExpiryBackgroundService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
 builder.Services.AddScoped<IActivityLogService, ActivityLogService>();

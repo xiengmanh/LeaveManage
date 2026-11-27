@@ -113,6 +113,16 @@ public class LeaveRepository : ILeaveRepository
             .Include(r => r.LeaveType)
             .FirstOrDefaultAsync(r => r.Id == id);
 
+    public async Task<List<(int RequestId, int EmployeeId)>> GetOverduePendingRequestKeysAsync(DateTime cutoff)
+    {
+        var rows = await _context.LeaveRequests.AsNoTracking()
+            .Where(r => r.Status == LeaveRequestStatus.Pending && r.StartDate < cutoff)
+            .OrderBy(r => r.StartDate).ThenBy(r => r.Id)
+            .Select(r => new { r.Id, r.EmployeeId })
+            .ToListAsync();
+        return rows.Select(r => (r.Id, r.EmployeeId)).ToList();
+    }
+
     public Task<bool> HasOverlapAsync(int employeeId, DateTime start, DateTime end, int excludeRequestId) =>
         // Hai khoảng [s1,e1] và [s2,e2] giao nhau khi s1 <= e2 và s2 <= e1
         _context.LeaveRequests.AnyAsync(r => r.EmployeeId == employeeId

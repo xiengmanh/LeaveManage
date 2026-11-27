@@ -29,6 +29,8 @@ public interface ILeaveRepository
     Task<LeaveRequest?> GetRequestDetailAsync(int id);
     Task<int?> GetRequestOwnerIdAsync(int id);
     Task<LeaveRequest?> GetRequestTrackedAsync(int id);
+    /// <summary>Các đơn Pending có ngày bắt đầu trước cutoff, dạng (RequestId, EmployeeId).</summary>
+    Task<List<(int RequestId, int EmployeeId)>> GetOverduePendingRequestKeysAsync(DateTime cutoff);
     Task<bool> HasOverlapAsync(int employeeId, DateTime start, DateTime end, int excludeRequestId);
     Task<int> SumDaysInYearAsync(int employeeId, int leaveTypeId, int year, int excludeRequestId);
     Task AddRequestAsync(LeaveRequest request);
